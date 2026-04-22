@@ -1,0 +1,256 @@
+:root {
+  color-scheme: light;
+  --bg: #f2efe8;
+  --panel: rgba(255, 252, 247, 0.85);
+  --panel-border: rgba(41, 52, 64, 0.12);
+  --ink: #17212b;
+  --muted: #60707f;
+  --accent: #145c4c;
+  --accent-strong: #0c4539;
+  --accent-soft: #d7eee7;
+  --warning: #9a3d12;
+  --shadow: 0 22px 50px rgba(20, 35, 46, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(20, 92, 76, 0.18), transparent 30%),
+    radial-gradient(circle at right, rgba(188, 115, 42, 0.16), transparent 25%),
+    linear-gradient(180deg, #ebe6da 0%, var(--bg) 55%, #e5e0d4 100%);
+}
+
+.app-shell {
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 36px 0 48px;
+}
+
+.hero {
+  margin-bottom: 24px;
+}
+
+.eyebrow,
+.section-title {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 4vw, 4.4rem);
+  line-height: 0.95;
+  max-width: 10ch;
+}
+
+.intro {
+  max-width: 58ch;
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+.panel {
+  backdrop-filter: blur(14px);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+}
+
+.controls-panel {
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.snapshot-form {
+  margin-bottom: 16px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.form-row,
+.viewer-header,
+.helper-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+input {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(23, 33, 43, 0.12);
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--ink);
+  font: inherit;
+}
+
+input:focus {
+  outline: 2px solid rgba(20, 92, 76, 0.25);
+  border-color: rgba(20, 92, 76, 0.45);
+}
+
+button {
+  border: 0;
+  border-radius: 16px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
+.primary-button {
+  padding: 16px 20px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.primary-button:hover {
+  background: var(--accent-strong);
+}
+
+.ghost-button {
+  padding: 12px 14px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.helper-row {
+  margin-bottom: 18px;
+  align-items: flex-start;
+}
+
+.helper-text,
+.current-camera,
+.status {
+  margin: 0;
+  color: var(--muted);
+}
+
+.saved-cameras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.saved-camera {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 999px;
+  background: rgba(20, 92, 76, 0.08);
+}
+
+.saved-camera button {
+  border-radius: 999px;
+}
+
+.saved-camera-load {
+  padding: 8px 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.saved-camera-remove {
+  width: 30px;
+  height: 30px;
+  background: rgba(23, 33, 43, 0.08);
+  color: var(--ink);
+}
+
+.viewer-panel {
+  padding: 24px;
+}
+
+.viewer-header {
+  margin-bottom: 12px;
+}
+
+.status {
+  min-height: 24px;
+  margin-bottom: 16px;
+}
+
+.status.error {
+  color: var(--warning);
+}
+
+.status.success {
+  color: var(--accent-strong);
+}
+
+.snapshot-frame {
+  position: relative;
+  min-height: 360px;
+  overflow: hidden;
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(20, 92, 76, 0.15), rgba(188, 115, 42, 0.12)),
+    #dde3e1;
+  border: 1px solid rgba(23, 33, 43, 0.08);
+}
+
+#snapshot-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 360px;
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    width: min(100% - 20px, 1100px);
+    padding-top: 22px;
+  }
+
+  .form-row,
+  .viewer-header,
+  .helper-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .primary-button,
+  .ghost-button {
+    width: 100%;
+  }
+}

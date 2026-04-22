@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evercam Snapshot Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero">
+      <p class="eyebrow">Installer Snapshot Tool</p>
+      <h1>Pull a camera snapshot fast.</h1>
+      <p class="intro">
+        Type a camera ID, fetch the latest live view, and keep your commonly used cameras handy for quick refreshes.
+      </p>
+    </section>
+
+    <section class="panel controls-panel">
+      <form id="snapshot-form" class="snapshot-form">
+        <label for="camera-id" class="label">Camera ID</label>
+        <div class="form-row">
+          <input
+            id="camera-id"
+            name="cameraId"
+            type="text"
+            placeholder="e.g. gpocam"
+            autocomplete="off"
+            spellcheck="false"
+            required
+          >
+          <button type="submit" class="primary-button">Get Snapshot</button>
+        </div>
+      </form>
+
+      <div class="helper-row">
+        <p class="helper-text">Saved locally in this browser so installers do not need to keep retyping camera IDs.</p>
+        <button id="clear-history" type="button" class="ghost-button">Clear Saved IDs</button>
+      </div>
+
+      <div>
+        <p class="section-title">Recent Cameras</p>
+        <div id="saved-cameras" class="saved-cameras"></div>
+      </div>
+    </section>
+
+    <section class="panel viewer-panel">
+      <div class="viewer-header">
+        <div>
+          <p class="section-title">Live Snapshot</p>
+          <p id="current-camera" class="current-camera">No camera selected yet.</p>
+        </div>
+        <button id="refresh-button" type="button" class="ghost-button" disabled>Refresh Snapshot</button>
+      </div>
+
+      <p id="status" class="status">Enter a camera ID to load a snapshot.</p>
+
+      <div class="snapshot-frame">
+        <img id="snapshot-image" alt="" hidden>
+        <div id="snapshot-placeholder" class="placeholder">
+          Snapshot will appear here.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
