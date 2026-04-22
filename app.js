@@ -45,6 +45,7 @@ let currentObjectUrl = "";
 let currentTab = "snapshot";
 let hlsPlayer = null;
 let currentJob = null;
+let sessionAuthToken = "";
 
 function getSavedCameraIds() {
   try {
@@ -190,15 +191,22 @@ function updateLocalFeedUi() {
 
 async function getAuthHeaders() {
   const token = authTokenInput.value.trim();
+  const username = authUsernameInput.value.trim();
+  const password = authPasswordInput.value;
+
+  if (token && (username || password)) {
+    throw new Error("Use either bearer token or username/password, not both.");
+  }
+
   if (token) {
     setSavedToken(token);
+    sessionAuthToken = "";
     return { Authorization: `Bearer ${token}` };
   }
 
-  const username = authUsernameInput.value.trim();
-  const password = authPasswordInput.value;
   if (!username || !password) {
     setSavedToken("");
+    sessionAuthToken = "";
     return {};
   }
 
@@ -225,9 +233,8 @@ async function getAuthHeaders() {
     throw new Error("Evercam login succeeded but no token was returned.");
   }
 
-  authTokenInput.value = loginToken;
-  setSavedToken(loginToken);
-  return { Authorization: `Bearer ${loginToken}` };
+  sessionAuthToken = loginToken;
+  return { Authorization: `Bearer ${sessionAuthToken}` };
 }
 
 function renderJobResult(job) {
@@ -549,6 +556,7 @@ clearHistoryButton.addEventListener("click", () => {
 clearTokenButton.addEventListener("click", () => {
   authTokenInput.value = "";
   setSavedToken("");
+  sessionAuthToken = "";
 });
 
 openLocalCameraButton.addEventListener("click", () => {
