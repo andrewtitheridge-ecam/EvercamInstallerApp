@@ -237,6 +237,10 @@ async function getAuthHeaders() {
   return { Authorization: `Bearer ${sessionAuthToken}` };
 }
 
+function getCurrentAuthToken() {
+  return authTokenInput.value.trim() || sessionAuthToken || "";
+}
+
 function renderJobResult(job) {
   currentJob = job;
   jobResult.hidden = false;
@@ -410,7 +414,7 @@ async function loadLiveFeed(cameraId) {
 
   try {
     const headers = await getAuthHeaders();
-    const token = authTokenInput.value.trim();
+    const token = getCurrentAuthToken();
     const detailsResponse = await fetch(buildCameraDetailsUrl(normalized), {
       headers
     });
