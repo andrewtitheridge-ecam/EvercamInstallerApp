@@ -453,7 +453,8 @@ jobForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const jobId = jobInput.value.trim();
   if (!jobId) {
-    setJobStatus("Enter a job number first.", "error");
+    jobResult.hidden = true;
+    setJobStatus("Job number is optional. Enter one to load linked cameras, or use the camera ID field below.", "");
     return;
   }
 
@@ -480,7 +481,12 @@ jobForm.addEventListener("submit", async (event) => {
   } catch (error) {
     currentJob = null;
     jobResult.hidden = true;
-    setJobStatus(error.message || "Could not load that job.", "error");
+    const message = error.message || "Could not load that job.";
+    if (message.includes("Missing Zoho environment variables")) {
+      setJobStatus("Job lookup is not configured in Vercel yet. Add the Zoho environment variables, or use the camera ID field below.", "error");
+      return;
+    }
+    setJobStatus(message, "error");
   }
 });
 
