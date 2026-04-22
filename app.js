@@ -138,8 +138,10 @@ function renderSavedCameraIds() {
     loadButton.className = "saved-camera-load";
     loadButton.textContent = cameraId;
     loadButton.addEventListener("click", () => {
-      lookupInput.value = cameraId;
-      loadCurrentView(cameraId);
+      loadCurrentView(cameraId, {
+        preserveSummary: !jobResult.hidden,
+        preserveLookupValue: lookupInput.value
+      });
     });
 
     const removeButton = document.createElement("button");
@@ -406,7 +408,10 @@ function switchTab(tab, options = {}) {
   );
 
   if (currentCameraId && !isLocal && !options.suppressLoad) {
-    loadCurrentView(currentCameraId);
+    loadCurrentView(currentCameraId, {
+      preserveSummary: !jobResult.hidden,
+      preserveLookupValue: lookupInput.value
+    });
   }
 
   if (isLocal) {
