@@ -1,10 +1,28 @@
 const ZOHO_ACCOUNTS_URL = "https://accounts.zoho.com";
 const ZOHO_API_DOMAIN = process.env.ZOHO_API_DOMAIN || "https://www.zohoapis.com";
+const INSTALLATION_WORKSHEET_BASE_URL = "https://forms.zohopublic.com/Evercam/form/installationJobsheet/formperma/_yU7tczIf-t5B42yql72LK3ZUJOapHiKZBCMQpf6pMg";
 
 function sendJson(res, status, body) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(body));
+}
+
+function buildWorksheetUrl(job) {
+  if (!job || !job.Job_ID_Number || !job.Name) {
+    return "";
+  }
+
+  const params = new URLSearchParams({
+    job_name: job.Name || "",
+    job_id: job.Job_ID_Number || "",
+    type: job.Job_Type || "",
+    project_name: job.Projex?.name || "",
+    address: job.Address || job.Installation_Address || "",
+    referrername: job.id || ""
+  });
+
+  return `${INSTALLATION_WORKSHEET_BASE_URL}?${params.toString()}`;
 }
 
 async function getAccessToken() {
@@ -143,6 +161,7 @@ module.exports = async (req, res) => {
       dealName: job.Deal_Name?.name || "",
       projectName: job.Projex?.name || "",
       qtyCams: job.Qty_Cams || 0,
+      worksheetUrl: buildWorksheetUrl(job),
       cameras
     });
   } catch (error) {

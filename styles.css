@@ -140,6 +140,16 @@ h1 {
   gap: 6px;
 }
 
+.worksheet-link {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.worksheet-link:hover {
+  text-decoration: underline;
+}
+
 .job-result.project-emphasis {
   background:
     linear-gradient(135deg, rgba(196, 22, 28, 0.1), rgba(16, 28, 39, 0.06)),

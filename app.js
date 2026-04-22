@@ -36,6 +36,7 @@ const lookupStatusText = document.getElementById("lookup-status");
 const jobResult = document.getElementById("job-result");
 const jobNameText = document.getElementById("job-name");
 const jobMetaText = document.getElementById("job-meta");
+const jobWorksheetLink = document.getElementById("job-worksheet-link");
 const jobCameras = document.getElementById("job-cameras");
 const projectResult = document.getElementById("project-result");
 const projectNameText = document.getElementById("project-name");
@@ -253,10 +254,16 @@ function renderJobResult(job) {
 
   const meta = [];
   if (job.projectName) meta.push(`Project: ${job.projectName}`);
-  if (job.dealName) meta.push(`Deal: ${job.dealName}`);
-  if (job.status) meta.push(`Status: ${job.status}`);
   if (job.installDate) meta.push(`Install: ${job.installDate}`);
   jobMetaText.textContent = meta.join(" | ");
+
+  if (job.worksheetUrl) {
+    jobWorksheetLink.href = job.worksheetUrl;
+    jobWorksheetLink.hidden = false;
+  } else {
+    jobWorksheetLink.hidden = true;
+    jobWorksheetLink.removeAttribute("href");
+  }
 
   jobCameras.innerHTML = "";
   if (!job.cameras.length) {
@@ -289,7 +296,8 @@ function renderJobResult(job) {
 function renderProjectResult(projectId, cameras) {
   projectResult.hidden = false;
   projectResult.classList.toggle("project-emphasis", cameras.length > 1);
-  projectNameText.textContent = projectId;
+  const projectName = cameras[0]?.projectName || projectId;
+  projectNameText.textContent = projectName;
   projectMetaText.textContent = cameras.length > 1
     ? `${cameras.length} cameras found for this project. The first snapshot has been loaded automatically.`
     : `${cameras.length} camera found for this project.`;
@@ -320,6 +328,15 @@ function hideProjectResult() {
   projectNameText.textContent = "";
   projectMetaText.textContent = "";
   projectCameras.innerHTML = "";
+}
+
+function hideJobResult() {
+  jobResult.hidden = true;
+  jobNameText.textContent = "";
+  jobMetaText.textContent = "";
+  jobWorksheetLink.hidden = true;
+  jobWorksheetLink.removeAttribute("href");
+  jobCameras.innerHTML = "";
 }
 
 function looksLikeProjectId(value) {
@@ -392,6 +409,8 @@ async function loadSnapshot(cameraId) {
   }
 
   currentCameraId = normalized;
+  hideJobResult();
+  hideProjectResult();
   lookupInput.value = normalized;
   refreshButton.disabled = false;
   currentCameraText.textContent = `Current camera: ${normalized}`;
@@ -441,6 +460,8 @@ async function loadLiveFeed(cameraId) {
   }
 
   currentCameraId = normalized;
+  hideJobResult();
+  hideProjectResult();
   lookupInput.value = normalized;
   refreshButton.disabled = false;
   currentCameraText.textContent = `Current camera: ${normalized}`;
@@ -531,6 +552,8 @@ function loadCurrentView(cameraId) {
 
   if (currentTab === "local") {
     currentCameraId = normalized;
+    hideJobResult();
+    hideProjectResult();
     lookupInput.value = currentCameraId;
     currentCameraText.textContent = `Current camera: ${currentCameraId || "No camera selected yet."}`;
     rememberCameraId(currentCameraId);
@@ -603,6 +626,7 @@ lookupInput.addEventListener("input", () => {
 
 async function loadProjectCameras(projectId) {
   setStatus("Loading project cameras...", "");
+  hideJobResult();
   hideProjectResult();
 
   try {
@@ -617,7 +641,8 @@ async function loadProjectCameras(projectId) {
     const cameras = Array.isArray(result.cameras)
       ? result.cameras.map((camera) => ({
           id: (camera.id || camera.exid || "").toLowerCase(),
-          name: camera.name || ""
+          name: camera.name || "",
+          projectName: camera.project?.name || ""
         })).filter((camera) => camera.id)
       : [];
 
@@ -625,7 +650,6 @@ async function loadProjectCameras(projectId) {
       throw new Error("No cameras found for that project.");
     }
 
-    lookupInput.value = cameras[0].id;
     currentCameraId = cameras[0].id;
     currentCameraText.textContent = `Current camera: ${currentCameraId}`;
     refreshButton.disabled = false;
@@ -639,9 +663,31 @@ async function loadProjectCameras(projectId) {
     setLookupStatus(`Loaded ${cameras.length} camera${cameras.length === 1 ? "" : "s"} for project ${projectId}.`, "success");
     switchTab("snapshot");
     await loadSnapshot(cameras[0].id);
+    lookupInput.value = projectId;
   } catch (error) {
     setLookupStatus(error.message || "Could not load that project.", "error");
   }
+}
+
+async function tryLoadSingleCamera(cameraId) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(buildCameraDetailsUrl(cameraId), { headers });
+  if (!response.ok) {
+    return false;
+  }
+
+  const result = await response.json();
+  const camera = Array.isArray(result.cameras) ? result.cameras[0] : null;
+  if (!camera) {
+    return false;
+  }
+
+  hideProjectResult();
+  jobResult.hidden = true;
+  setLookupStatus(`Loaded camera ${cameraId}.`, "success");
+  await loadCurrentView(cameraId);
+  lookupInput.value = cameraId;
+  return true;
 }
 
 lookupForm.addEventListener("submit", async (event) => {
@@ -658,7 +704,7 @@ lookupForm.addEventListener("submit", async (event) => {
     const jobId = value;
     setLookupStatus("Finding job...", "");
     hideProjectResult();
-    jobResult.hidden = true;
+    hideJobResult();
 
     try {
       const response = await fetch(`/api/zoho-job?jobId=${encodeURIComponent(jobId)}`);
@@ -672,17 +718,17 @@ lookupForm.addEventListener("submit", async (event) => {
       setLookupStatus(`Loaded ${result.cameras.length} camera${result.cameras.length === 1 ? "" : "s"} for job ${result.jobNumber}.`, "success");
 
       if (result.cameras.length) {
-        lookupInput.value = result.cameras[0].id;
         currentCameraId = result.cameras[0].id;
         currentCameraText.textContent = `Current camera: ${currentCameraId}`;
         refreshButton.disabled = false;
         switchTab("snapshot");
         await loadSnapshot(result.cameras[0].id);
+        lookupInput.value = jobId;
       }
-    } catch (error) {
-      currentJob = null;
-      jobResult.hidden = true;
-      const message = error.message || "Could not load that job.";
+      } catch (error) {
+        currentJob = null;
+        hideJobResult();
+        const message = error.message || "Could not load that job.";
       if (message.includes("Missing Zoho environment variables")) {
         setLookupStatus("Job lookup is not configured in Vercel yet. Add the Zoho environment variables, or use a camera or project ID instead.", "error");
         return;
@@ -692,13 +738,18 @@ lookupForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  jobResult.hidden = true;
+    hideJobResult();
+    hideProjectResult();
+
+  const loadedCamera = await tryLoadSingleCamera(value);
+  if (loadedCamera) {
+    return;
+  }
+
   if (looksLikeProjectId(value)) {
     await loadProjectCameras(value);
     return;
   }
 
-  hideProjectResult();
-  setLookupStatus("Loading camera...", "");
-  await loadCurrentView(value);
+  setLookupStatus("No camera or project found for that ID.", "error");
 });
