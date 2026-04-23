@@ -24,16 +24,19 @@
       <form id="lookup-form" class="snapshot-form" autocomplete="on">
         <label for="lookup-id" class="label">Camera ID or Project ID or Job Number</label>
         <div class="form-row">
-          <input
-            id="lookup-id"
-            name="lookupId"
-            type="text"
-            placeholder="e.g. 03art-jsfrz, clayt-fqhiv, or 30361"
-            autocomplete="off"
-            spellcheck="false"
-            autocapitalize="none"
-            enterkeyhint="search"
-          >
+          <div class="lookup-input-wrap">
+            <input
+              id="lookup-id"
+              name="lookupId"
+              type="text"
+              placeholder="e.g. 03art-jsfrz, clayt-fqhiv, or 30361"
+              autocomplete="off"
+              spellcheck="false"
+              autocapitalize="none"
+              enterkeyhint="search"
+            >
+            <div id="lookup-suggestions" class="lookup-suggestions" hidden></div>
+          </div>
           <button type="submit" class="primary-button">Find Camera</button>
         </div>
         <p id="lookup-status" class="helper-text">Enter a camera ID, project ID, or 5-digit job number. The app will figure out which one you entered.</p>

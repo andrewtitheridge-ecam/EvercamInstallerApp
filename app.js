@@ -1,4 +1,5 @@
 const STORAGE_KEY = "evercam-saved-camera-ids";
+const LOOKUP_HISTORY_KEY = "evercam-lookup-history";
 const REMEMBERED_USERNAME_KEY = "evercam-remembered-username";
 const REMEMBERED_PASSWORD_KEY = "evercam-remembered-password";
 const LOCAL_FEED_STORAGE_KEY = "evercam-local-feed-settings";
@@ -6,6 +7,7 @@ const MAX_SAVED = 8;
 
 const lookupForm = document.getElementById("lookup-form");
 const lookupInput = document.getElementById("lookup-id");
+const lookupSuggestions = document.getElementById("lookup-suggestions");
 const authUsernameInput = document.getElementById("auth-username");
 const authPasswordInput = document.getElementById("auth-password");
 const rememberLoginInput = document.getElementById("remember-login");
@@ -61,6 +63,19 @@ function setSavedCameraIds(ids) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
 }
 
+function getLookupHistory() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LOOKUP_HISTORY_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setLookupHistory(items) {
+  localStorage.setItem(LOOKUP_HISTORY_KEY, JSON.stringify(items));
+}
+
 function getRememberedUsername() {
   return localStorage.getItem(REMEMBERED_USERNAME_KEY) || "";
 }
@@ -100,6 +115,14 @@ function getLocalFeedSettings() {
 
 function setLocalFeedSettings(settings) {
   localStorage.setItem(LOCAL_FEED_STORAGE_KEY, JSON.stringify(settings));
+}
+
+function rememberLookupValue(value) {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return;
+
+  const next = [normalized, ...getLookupHistory().filter((item) => item !== normalized)].slice(0, 12);
+  setLookupHistory(next);
 }
 
 function rememberCameraId(cameraId) {
@@ -177,8 +200,49 @@ function updateCurrentCameraText(cameraId = currentCameraId, cameraName = curren
   }
 
   currentCameraText.textContent = friendlyName
-    ? `Current camera: ${normalizedId} - ${friendlyName}`
+    ? `Current camera: ${friendlyName} (${normalizedId})`
     : `Current camera: ${normalizedId}`;
+}
+
+function hideLookupSuggestions() {
+  lookupSuggestions.hidden = true;
+  lookupSuggestions.innerHTML = "";
+}
+
+function renderLookupSuggestions(query) {
+  const normalized = query.trim().toLowerCase();
+  if (normalized.length < 3) {
+    hideLookupSuggestions();
+    return;
+  }
+
+  const matches = getLookupHistory()
+    .filter((item) => item.startsWith(normalized) && item !== normalized)
+    .slice(0, 6);
+
+  if (!matches.length) {
+    hideLookupSuggestions();
+    return;
+  }
+
+  lookupSuggestions.innerHTML = "";
+  matches.forEach((match) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "lookup-suggestion";
+    button.textContent = match;
+    button.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      lookupInput.value = match;
+      hideLookupSuggestions();
+      lookupInput.focus();
+      const length = match.length;
+      lookupInput.setSelectionRange(length, length);
+    });
+    lookupSuggestions.appendChild(button);
+  });
+
+  lookupSuggestions.hidden = false;
 }
 
 function buildSnapshotUrl(cameraId) {
@@ -199,6 +263,32 @@ function buildCameraDetailsUrl(cameraId) {
 function buildProjectCamerasUrl(projectId) {
   const encodedId = encodeURIComponent(projectId.toLowerCase());
   return `https://media.evercam.io/v2/projects/${encodedId}/cameras`;
+}
+
+async function readResponseBlobWithProgress(response, onProgress) {
+  if (!response.body || typeof response.body.getReader !== "function") {
+    onProgress?.(null);
+    return response.blob();
+  }
+
+  const totalBytes = Number(response.headers.get("content-length")) || 0;
+  const reader = response.body.getReader();
+  const chunks = [];
+  let receivedBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      chunks.push(value);
+      receivedBytes += value.length;
+      onProgress?.(totalBytes > 0 ? Math.round((receivedBytes / totalBytes) * 100) : null);
+    }
+  }
+
+  return new Blob(chunks, {
+    type: response.headers.get("content-type") || "image/jpeg"
+  });
 }
 
 function buildLocalCameraUrl() {
@@ -468,6 +558,18 @@ async function loadSnapshot(cameraId, options = {}) {
 
   try {
     const headers = await getAuthHeaders();
+    try {
+      const detailsResponse = await fetch(buildCameraDetailsUrl(normalized), { headers });
+      if (detailsResponse.ok) {
+        const detailsJson = await detailsResponse.json();
+        const camera = Array.isArray(detailsJson.cameras) ? detailsJson.cameras[0] : null;
+        currentCameraName = camera?.name || currentCameraName;
+        updateCurrentCameraText(normalized, currentCameraName);
+      }
+    } catch {
+      // Ignore metadata lookup failures and continue trying the snapshot itself.
+    }
+
     const response = await fetch(buildSnapshotUrl(normalized), {
       headers
     });
@@ -476,7 +578,20 @@ async function loadSnapshot(cameraId, options = {}) {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const blob = await response.blob();
+    setStatus("Success. Snapshot is loading in the background...", "success");
+    snapshotPlaceholder.textContent = "Snapshot found. Downloading image...";
+
+    const blob = await readResponseBlobWithProgress(response, (percent) => {
+      if (percent === null) {
+        setStatus("Success. Snapshot is loading in the background...", "success");
+        snapshotPlaceholder.textContent = "Snapshot found. Downloading image...";
+        return;
+      }
+
+      setStatus(`Success. Snapshot is loading in the background... ${percent}%`, "success");
+      snapshotPlaceholder.textContent = `Downloading snapshot... ${percent}%`;
+    });
+
     currentObjectUrl = URL.createObjectURL(blob);
     snapshotImage.src = currentObjectUrl;
     snapshotImage.alt = `Live snapshot for ${normalized}`;
@@ -684,6 +799,11 @@ lookupInput.addEventListener("input", () => {
       lookupInput.setSelectionRange(start, end);
     }
   }
+  renderLookupSuggestions(lookupInput.value);
+});
+lookupInput.addEventListener("focus", () => renderLookupSuggestions(lookupInput.value));
+lookupInput.addEventListener("blur", () => {
+  window.setTimeout(hideLookupSuggestions, 120);
 });
 
 async function loadProjectCameras(projectId) {
@@ -718,6 +838,7 @@ async function loadProjectCameras(projectId) {
 
     renderProjectResult(projectId, cameras, cameras[0].id);
     setLookupStatus(`Loaded ${cameras.length} camera${cameras.length === 1 ? "" : "s"} for project ${projectId}.`, "success");
+    rememberLookupValue(projectId);
     switchTab("snapshot", { suppressLoad: true });
       await loadSnapshot(cameras[0].id, {
         preserveSummary: true,
@@ -746,6 +867,7 @@ async function tryLoadSingleCamera(cameraId) {
   currentCameraName = camera.name || "";
   hideJobResult();
   setLookupStatus(`Loaded camera ${cameraId}.`, "success");
+  rememberLookupValue(cameraId);
   await loadCurrentView(cameraId, { preserveCameraName: true });
   lookupInput.value = cameraId;
   return true;
@@ -777,10 +899,11 @@ lookupForm.addEventListener("submit", async (event) => {
         throw new Error(result.error || "Job lookup failed.");
       }
 
-      renderJobResult(result, result.cameras[0]?.id || "");
-      setLookupStatus(`Loaded ${result.cameras.length} camera${result.cameras.length === 1 ? "" : "s"} for job ${result.jobNumber}.`, "success");
+        renderJobResult(result, result.cameras[0]?.id || "");
+        setLookupStatus(`Loaded ${result.cameras.length} camera${result.cameras.length === 1 ? "" : "s"} for job ${result.jobNumber}.`, "success");
+        rememberLookupValue(jobId);
 
-      if (result.cameras.length) {
+        if (result.cameras.length) {
         currentCameraId = result.cameras[0].id;
         currentCameraName = result.cameras[0].name || "";
         updateCurrentCameraText(currentCameraId, currentCameraName);
