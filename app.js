@@ -599,7 +599,10 @@ function loadCurrentView(cameraId, options = {}) {
 }
 refreshButton.addEventListener("click", () => {
   if (currentCameraId) {
-    loadCurrentView(currentCameraId);
+    loadCurrentView(currentCameraId, {
+      preserveSummary: !jobResult.hidden,
+      preserveLookupValue: lookupInput.value
+    });
   }
 });
 
