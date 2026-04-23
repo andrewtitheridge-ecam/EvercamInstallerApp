@@ -105,13 +105,17 @@
         <button id="local-tab" type="button" class="tab-button" role="tab" aria-selected="false">Local Feed</button>
       </div>
 
-      <div class="viewer-header">
-        <div>
-          <p id="viewer-title" class="section-title">Live Snapshot</p>
-          <p id="current-camera" class="current-camera">No camera selected yet.</p>
+        <div class="viewer-header">
+          <div>
+            <p id="viewer-title" class="section-title">Live Snapshot</p>
+            <p id="current-camera" class="current-camera">No camera selected yet.</p>
+          </div>
+          <div class="viewer-actions">
+            <button id="prev-camera-button" type="button" class="ghost-button nav-button" hidden>&larr; Previous</button>
+            <button id="refresh-button" type="button" class="ghost-button" disabled>Refresh View</button>
+            <button id="next-camera-button" type="button" class="ghost-button nav-button" hidden>Next &rarr;</button>
+          </div>
         </div>
-        <button id="refresh-button" type="button" class="ghost-button" disabled>Refresh View</button>
-      </div>
 
       <p id="status" class="status">Enter a camera ID to load a snapshot.</p>
 

@@ -196,6 +196,16 @@ h1 {
   justify-content: space-between;
 }
 
+.viewer-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.nav-button {
+  min-width: 112px;
+}
+
 .lookup-input-wrap {
   position: relative;
   flex: 1;
@@ -418,6 +428,11 @@ button:disabled {
   .form-row,
   .viewer-header,
   .helper-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .viewer-actions {
     flex-direction: column;
     align-items: stretch;
   }

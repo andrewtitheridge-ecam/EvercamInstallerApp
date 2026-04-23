@@ -15,6 +15,8 @@ const savedCameras = document.getElementById("saved-cameras");
 const clearHistoryButton = document.getElementById("clear-history");
 const clearLoginButton = document.getElementById("clear-login");
 const refreshButton = document.getElementById("refresh-button");
+const prevCameraButton = document.getElementById("prev-camera-button");
+const nextCameraButton = document.getElementById("next-camera-button");
 const snapshotTabButton = document.getElementById("snapshot-tab");
 const liveTabButton = document.getElementById("live-tab");
 const localTabButton = document.getElementById("local-tab");
@@ -49,6 +51,7 @@ let currentTab = "snapshot";
 let hlsPlayer = null;
 let currentJob = null;
 let sessionAuthToken = "";
+let currentCameraCollection = [];
 
 function getSavedCameraIds() {
   try {
@@ -202,6 +205,56 @@ function updateCurrentCameraText(cameraId = currentCameraId, cameraName = curren
   currentCameraText.textContent = friendlyName
     ? `Current camera: ${friendlyName} (${normalizedId})`
     : `Current camera: ${normalizedId}`;
+  updateCameraNavigation();
+}
+
+function setCurrentCameraCollection(cameras = []) {
+  currentCameraCollection = Array.isArray(cameras)
+    ? cameras
+        .map((camera) => ({
+          id: (camera.id || "").trim().toLowerCase(),
+          name: camera.name || ""
+        }))
+        .filter((camera) => camera.id)
+    : [];
+  updateCameraNavigation();
+}
+
+function updateCameraNavigation() {
+  const currentIndex = currentCameraCollection.findIndex((camera) => camera.id === currentCameraId);
+  const showNavigation = currentCameraCollection.length > 1 && currentIndex !== -1;
+
+  prevCameraButton.hidden = !showNavigation;
+  nextCameraButton.hidden = !showNavigation;
+
+  if (!showNavigation) {
+    prevCameraButton.disabled = true;
+    nextCameraButton.disabled = true;
+    return;
+  }
+
+  prevCameraButton.disabled = currentIndex <= 0;
+  nextCameraButton.disabled = currentIndex >= currentCameraCollection.length - 1;
+}
+
+function navigateCamera(direction) {
+  const currentIndex = currentCameraCollection.findIndex((camera) => camera.id === currentCameraId);
+  if (currentIndex === -1) {
+    return;
+  }
+
+  const target = currentCameraCollection[currentIndex + direction];
+  if (!target) {
+    return;
+  }
+
+  currentCameraName = target.name || "";
+  updateCurrentCameraText(target.id, currentCameraName);
+  loadCurrentView(target.id, {
+    preserveSummary: !jobResult.hidden,
+    preserveLookupValue: lookupInput.value,
+    preserveCameraName: true
+  });
 }
 
 function hideLookupSuggestions() {
@@ -458,6 +511,7 @@ function hideJobResult() {
   jobWorksheetLink.hidden = true;
   jobWorksheetLink.removeAttribute("href");
   jobCameras.innerHTML = "";
+  setCurrentCameraCollection([]);
 }
 
 function looksLikeProjectId(value) {
@@ -745,6 +799,9 @@ refreshButton.addEventListener("click", () => {
   }
 });
 
+prevCameraButton.addEventListener("click", () => navigateCamera(-1));
+nextCameraButton.addEventListener("click", () => navigateCamera(1));
+
 snapshotTabButton.addEventListener("click", () => switchTab("snapshot"));
 liveTabButton.addEventListener("click", () => switchTab("live"));
 localTabButton.addEventListener("click", () => switchTab("local"));
@@ -833,6 +890,7 @@ async function loadProjectCameras(projectId) {
 
       currentCameraId = cameras[0].id;
       currentCameraName = cameras[0].name || "";
+      setCurrentCameraCollection(cameras);
       updateCurrentCameraText(currentCameraId, currentCameraName);
       refreshButton.disabled = false;
 
@@ -864,9 +922,10 @@ async function tryLoadSingleCamera(cameraId) {
     return false;
   }
 
-  currentCameraName = camera.name || "";
-  hideJobResult();
-  setLookupStatus(`Loaded camera ${cameraId}.`, "success");
+    currentCameraName = camera.name || "";
+    hideJobResult();
+    setCurrentCameraCollection([]);
+    setLookupStatus(`Loaded camera ${cameraId}.`, "success");
   rememberLookupValue(cameraId);
   await loadCurrentView(cameraId, { preserveCameraName: true });
   lookupInput.value = cameraId;
@@ -904,10 +963,11 @@ lookupForm.addEventListener("submit", async (event) => {
         rememberLookupValue(jobId);
 
         if (result.cameras.length) {
-        currentCameraId = result.cameras[0].id;
-        currentCameraName = result.cameras[0].name || "";
-        updateCurrentCameraText(currentCameraId, currentCameraName);
-        refreshButton.disabled = false;
+          currentCameraId = result.cameras[0].id;
+          currentCameraName = result.cameras[0].name || "";
+          setCurrentCameraCollection(result.cameras);
+          updateCurrentCameraText(currentCameraId, currentCameraName);
+          refreshButton.disabled = false;
         switchTab("snapshot", { suppressLoad: true });
         await loadSnapshot(result.cameras[0].id, {
           preserveSummary: true,
