@@ -203,6 +203,7 @@ h1 {
 }
 
 .nav-button {
+  display: none;
   min-width: 112px;
 }
 
@@ -365,6 +366,30 @@ button:disabled {
   padding: 24px;
 }
 
+.admin-tools {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: rgba(16, 28, 39, 0.04);
+  border: 1px solid rgba(16, 28, 39, 0.08);
+}
+
+.admin-tools summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.admin-tools-body {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.admin-url {
+  word-break: break-all;
+}
+
 .view-panel {
   display: block;
 }
@@ -395,6 +420,33 @@ button:disabled {
     linear-gradient(135deg, rgba(196, 22, 28, 0.12), rgba(16, 28, 39, 0.1)),
     #dde3e1;
   border: 1px solid rgba(23, 33, 43, 0.08);
+}
+
+.image-nav-button {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 52px;
+  height: 72px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--accent-strong);
+  box-shadow: 0 10px 24px rgba(16, 28, 39, 0.16);
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.image-nav-left {
+  left: 12px;
+}
+
+.image-nav-right {
+  right: 12px;
+}
+
+.image-nav-button:hover {
+  background: rgba(255, 255, 255, 0.96);
 }
 
 #snapshot-image {

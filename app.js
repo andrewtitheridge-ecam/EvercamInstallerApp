@@ -17,6 +17,8 @@ const clearLoginButton = document.getElementById("clear-login");
 const refreshButton = document.getElementById("refresh-button");
 const prevCameraButton = document.getElementById("prev-camera-button");
 const nextCameraButton = document.getElementById("next-camera-button");
+const overlayPrevCameraButton = document.getElementById("overlay-prev-camera-button");
+const overlayNextCameraButton = document.getElementById("overlay-next-camera-button");
 const snapshotTabButton = document.getElementById("snapshot-tab");
 const liveTabButton = document.getElementById("live-tab");
 const localTabButton = document.getElementById("local-tab");
@@ -43,6 +45,9 @@ const jobNameText = document.getElementById("job-name");
 const jobMetaText = document.getElementById("job-meta");
 const jobWorksheetLink = document.getElementById("job-worksheet-link");
 const jobCameras = document.getElementById("job-cameras");
+const adminSnapshotTools = document.getElementById("admin-snapshot-tools");
+const adminSnapshotLink = document.getElementById("admin-snapshot-link");
+const adminSnapshotUrlText = document.getElementById("admin-snapshot-url");
 
 let currentCameraId = "";
 let currentCameraName = "";
@@ -52,6 +57,7 @@ let hlsPlayer = null;
 let currentJob = null;
 let sessionAuthToken = "";
 let currentCameraCollection = [];
+let currentCameraMeta = null;
 
 function getSavedCameraIds() {
   try {
@@ -223,18 +229,25 @@ function setCurrentCameraCollection(cameras = []) {
 function updateCameraNavigation() {
   const currentIndex = currentCameraCollection.findIndex((camera) => camera.id === currentCameraId);
   const showNavigation = currentCameraCollection.length > 1 && currentIndex !== -1;
+  const showOverlayNavigation = showNavigation && currentTab === "snapshot";
 
   prevCameraButton.hidden = !showNavigation;
   nextCameraButton.hidden = !showNavigation;
+  overlayPrevCameraButton.hidden = !showOverlayNavigation;
+  overlayNextCameraButton.hidden = !showOverlayNavigation;
 
   if (!showNavigation) {
     prevCameraButton.disabled = true;
     nextCameraButton.disabled = true;
+    overlayPrevCameraButton.disabled = true;
+    overlayNextCameraButton.disabled = true;
     return;
   }
 
   prevCameraButton.disabled = currentIndex <= 0;
   nextCameraButton.disabled = currentIndex >= currentCameraCollection.length - 1;
+  overlayPrevCameraButton.disabled = currentIndex <= 0;
+  overlayNextCameraButton.disabled = currentIndex >= currentCameraCollection.length - 1;
 }
 
 function navigateCamera(direction) {
@@ -316,6 +329,53 @@ function buildCameraDetailsUrl(cameraId) {
 function buildProjectCamerasUrl(projectId) {
   const encodedId = encodeURIComponent(projectId.toLowerCase());
   return `https://media.evercam.io/v2/projects/${encodedId}/cameras`;
+}
+
+function buildAdminSnapshotUrl(camera) {
+  if (!camera?.nvr_host || !camera?.model) {
+    return "";
+  }
+
+  const model = String(camera.model).toLowerCase();
+  const host = `192-168-8-101-${camera.nvr_host}`;
+  const auth = "admin:Mehcam4Mehcam";
+
+  if (model.includes("hikvision")) {
+    return `https://${auth}@${host}/ISAPI/Streaming/channels/101/picture`;
+  }
+
+  if (model.includes("milesight")) {
+    return `https://${auth}@${host}/snapshot.cgi`;
+  }
+
+  return "";
+}
+
+function updateAdminSnapshotUi(camera = currentCameraMeta) {
+  const adminUrl = buildAdminSnapshotUrl(camera);
+  adminSnapshotTools.hidden = !adminUrl;
+
+  if (!adminUrl) {
+    adminSnapshotLink.hidden = true;
+    adminSnapshotLink.removeAttribute("href");
+    adminSnapshotUrlText.textContent = "";
+    return;
+  }
+
+  adminSnapshotLink.href = adminUrl;
+  adminSnapshotLink.hidden = false;
+  adminSnapshotUrlText.textContent = adminUrl;
+}
+
+function applyCameraMetadata(camera) {
+  if (!camera) {
+    return;
+  }
+
+  currentCameraMeta = camera;
+  currentCameraName = camera.name || currentCameraName;
+  updateCurrentCameraText(camera.id || currentCameraId, currentCameraName);
+  updateAdminSnapshotUi(camera);
 }
 
 async function readResponseBlobWithProgress(response, onProgress) {
@@ -590,6 +650,8 @@ async function loadSnapshot(cameraId, options = {}) {
   if (!options.preserveCameraName) {
     currentCameraName = "";
   }
+  currentCameraMeta = null;
+  updateAdminSnapshotUi(null);
   if (!options.preserveSummary) {
     hideJobResult();
   }
@@ -617,8 +679,7 @@ async function loadSnapshot(cameraId, options = {}) {
       if (detailsResponse.ok) {
         const detailsJson = await detailsResponse.json();
         const camera = Array.isArray(detailsJson.cameras) ? detailsJson.cameras[0] : null;
-        currentCameraName = camera?.name || currentCameraName;
-        updateCurrentCameraText(normalized, currentCameraName);
+        applyCameraMetadata(camera);
       }
     } catch {
       // Ignore metadata lookup failures and continue trying the snapshot itself.
@@ -674,6 +735,8 @@ async function loadLiveFeed(cameraId, options = {}) {
   if (!options.preserveCameraName) {
     currentCameraName = "";
   }
+  currentCameraMeta = null;
+  updateAdminSnapshotUi(null);
   if (!options.preserveSummary) {
     hideJobResult();
   }
@@ -710,8 +773,7 @@ async function loadLiveFeed(cameraId, options = {}) {
 
       const detailsJson = await detailsResponse.json();
       const camera = Array.isArray(detailsJson.cameras) ? detailsJson.cameras[0] : null;
-      currentCameraName = camera?.name || currentCameraName;
-      updateCurrentCameraText(normalized, currentCameraName);
+      applyCameraMetadata(camera);
       const hlsUrl = camera?.proxy_url?.hls || buildHlsUrl(normalized);
 
     if (window.Hls && window.Hls.isSupported()) {
@@ -801,6 +863,8 @@ refreshButton.addEventListener("click", () => {
 
 prevCameraButton.addEventListener("click", () => navigateCamera(-1));
 nextCameraButton.addEventListener("click", () => navigateCamera(1));
+overlayPrevCameraButton.addEventListener("click", () => navigateCamera(-1));
+overlayNextCameraButton.addEventListener("click", () => navigateCamera(1));
 
 snapshotTabButton.addEventListener("click", () => switchTab("snapshot"));
 liveTabButton.addEventListener("click", () => switchTab("live"));
@@ -922,7 +986,7 @@ async function tryLoadSingleCamera(cameraId) {
     return false;
   }
 
-    currentCameraName = camera.name || "";
+    applyCameraMetadata(camera);
     hideJobResult();
     setCurrentCameraCollection([]);
     setLookupStatus(`Loaded camera ${cameraId}.`, "success");
