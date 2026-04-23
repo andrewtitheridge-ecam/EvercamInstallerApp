@@ -1056,18 +1056,23 @@ lookupForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  if (looksLikeProjectId(value)) {
-    await loadProjectCameras(value);
-    return;
-  }
-
   if (cameraResult.status === 403) {
-    setLookupStatus("Camera found, but access is required. Sign in with a user who has camera view access.", "error");
+    setLookupStatus("Camera found, but your user does not have viewer access to this camera. Sign in with a user who does.", "error");
     return;
   }
 
   if (cameraResult.status === 401) {
     setLookupStatus("Login failed or session expired. Please sign in again.", "error");
+    return;
+  }
+
+  if (cameraResult.status === 400 && authUsernameInput.value.trim()) {
+    setLookupStatus("Camera lookup failed after sign-in. Please check your login details or camera access.", "error");
+    return;
+  }
+
+  if (looksLikeProjectId(value)) {
+    await loadProjectCameras(value);
     return;
   }
 
