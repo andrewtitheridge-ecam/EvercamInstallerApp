@@ -220,6 +220,13 @@ function setLookupStatusHtml(message, tone = "") {
   lookupStatusText.className = `helper-text${tone ? ` ${tone}` : ""}`;
 }
 
+function setProjectAccessRequiredMessage() {
+  setLookupStatusHtml(
+    'Project found, but <span class="lookup-emphasis">your user does not have access to this project or its cameras</span>. Sign in with a user who does.',
+    "error"
+  );
+}
+
 function updateCurrentCameraText(cameraId = currentCameraId, cameraName = currentCameraName) {
   const normalizedId = (cameraId || "").trim().toLowerCase();
   const friendlyName = (cameraName || "").trim();
@@ -1154,10 +1161,20 @@ async function loadProjectCameras(projectId) {
   try {
     const headers = await getAuthHeaders();
     const response = await fetch(buildProjectCamerasUrl(projectId), { headers });
-    const result = await response.json();
+    const rawText = await response.text();
+    let result = {};
+    try {
+      result = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      result = { message: rawText };
+    }
 
     if (!response.ok) {
-      throw new Error(result.message || result.error || "Could not load that project.");
+      if (response.status === 403) {
+        setProjectAccessRequiredMessage();
+        return;
+      }
+      throw new Error(result.message || result.error || rawText || "Could not load that project.");
     }
 
     const cameras = Array.isArray(result.cameras)
