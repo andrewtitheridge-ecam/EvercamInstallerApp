@@ -58,6 +58,27 @@ async function createJobNote(accessToken, jobRecordId, noteContent) {
   return 1;
 }
 
+function buildNoteContent(note, files) {
+  const normalizedNote = typeof note === "string" ? note.trim() : "";
+  const normalizedFiles = Array.isArray(files)
+    ? files.filter((file) => file?.name)
+    : [];
+
+  if (!normalizedFiles.length) {
+    return normalizedNote;
+  }
+
+  const attachmentSummary = normalizedFiles.length === 1
+    ? `Photo attached: ${normalizedFiles[0].name}`
+    : `Photos attached (${normalizedFiles.length}): ${normalizedFiles.map((file) => file.name).join(", ")}`;
+
+  if (!normalizedNote) {
+    return attachmentSummary;
+  }
+
+  return `${normalizedNote}\n\n${attachmentSummary}`;
+}
+
 async function fetchJobStatus(accessToken, jobRecordId) {
   const response = await fetch(`${ZOHO_API_DOMAIN}/crm/v8/Install/${jobRecordId}?fields=${encodeURIComponent("Status")}`, {
     headers: {
@@ -116,8 +137,9 @@ module.exports = async (req, res) => {
 
     const normalizedNote = typeof note === "string" ? note.trim() : "";
     const normalizedFiles = Array.isArray(files) ? files : [];
+    const noteContent = buildNoteContent(normalizedNote, normalizedFiles);
 
-    if (!normalizedNote && normalizedFiles.length === 0) {
+    if (!noteContent && normalizedFiles.length === 0) {
       return sendJson(res, 400, { error: "Provide note text or at least one image." });
     }
 
@@ -132,8 +154,8 @@ module.exports = async (req, res) => {
     let createdNotes = 0;
     let uploadedFiles = 0;
 
-    if (normalizedNote) {
-      createdNotes += await createJobNote(accessToken, jobRecordId, normalizedNote);
+    if (noteContent) {
+      createdNotes += await createJobNote(accessToken, jobRecordId, noteContent);
     }
 
     for (const file of normalizedFiles) {
