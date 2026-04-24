@@ -31,7 +31,7 @@ async function getAccessToken() {
 
 async function createJobNote(accessToken, jobRecordId, noteContent) {
   if (!noteContent) {
-    return 0;
+    return "";
   }
 
   const response = await fetch(`${ZOHO_API_DOMAIN}/crm/v8/Install/${jobRecordId}/Notes`, {
@@ -55,7 +55,8 @@ async function createJobNote(accessToken, jobRecordId, noteContent) {
     throw new Error(`Zoho note create failed: ${text}`);
   }
 
-  return 1;
+  const json = await response.json();
+  return json?.data?.[0]?.details?.id || "";
 }
 
 function buildNoteContent(note, files) {
@@ -96,13 +97,13 @@ async function fetchJobStatus(accessToken, jobRecordId) {
   return job?.Status || "";
 }
 
-async function uploadAttachment(accessToken, jobRecordId, file) {
+async function uploadAttachment(accessToken, noteRecordId, file) {
   const bytes = Buffer.from(file.contentBase64, "base64");
   const form = new FormData();
   const blob = new Blob([bytes], { type: file.type || "image/jpeg" });
   form.append("file", blob, file.name || "upload.jpg");
 
-  const response = await fetch(`${ZOHO_API_DOMAIN}/crm/v8/Install/${jobRecordId}/Attachments`, {
+  const response = await fetch(`${ZOHO_API_DOMAIN}/crm/v8/Notes/${noteRecordId}/Attachments`, {
     method: "POST",
     headers: {
       Authorization: `Zoho-oauthtoken ${accessToken}`
@@ -153,16 +154,21 @@ module.exports = async (req, res) => {
 
     let createdNotes = 0;
     let uploadedFiles = 0;
+    let noteRecordId = "";
 
-    if (noteContent) {
-      createdNotes += await createJobNote(accessToken, jobRecordId, noteContent);
+    if (noteContent || normalizedFiles.length) {
+      noteRecordId = await createJobNote(accessToken, jobRecordId, noteContent);
+      if (!noteRecordId) {
+        throw new Error("Zoho note create succeeded but no note record ID was returned.");
+      }
+      createdNotes = 1;
     }
 
     for (const file of normalizedFiles) {
       if (!file?.contentBase64) {
         continue;
       }
-      uploadedFiles += await uploadAttachment(accessToken, jobRecordId, file);
+      uploadedFiles += await uploadAttachment(accessToken, noteRecordId, file);
     }
 
     return sendJson(res, 200, {

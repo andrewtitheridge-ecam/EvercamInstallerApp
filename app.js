@@ -277,12 +277,12 @@ function getJobFileKey(file) {
 
 function appendSelectedJobFiles(files) {
   const nextFiles = Array.isArray(files) ? files : Array.from(files || []);
-  const seen = new Set(selectedJobFiles.map(getJobFileKey));
+  const seen = new Set(selectedJobFiles.map((entry) => getJobFileKey(entry.file)));
 
   nextFiles.forEach((file) => {
     const key = getJobFileKey(file);
     if (!seen.has(key)) {
-      selectedJobFiles.push(file);
+      selectedJobFiles.push({ file });
       seen.add(key);
     }
   });
@@ -291,7 +291,7 @@ function appendSelectedJobFiles(files) {
 function renderSelectedJobFiles() {
   const files = selectedJobFiles;
   jobNoteFiles.textContent = files.length
-    ? `${files.length} photo${files.length === 1 ? "" : "s"} selected: ${files.map((file) => file.name).join(", ")}`
+    ? `${files.length} photo${files.length === 1 ? "" : "s"} selected: ${files.map((entry, index) => `install photo ${String(index + 1).padStart(2, "0")}${getPreferredImageExtension(entry.file)}`).join(", ")}`
     : "No photos selected.";
 }
 
@@ -323,6 +323,76 @@ async function fileToBase64(file) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
   return btoa(binary);
+}
+
+function getPreferredImageExtension(file) {
+  const type = String(file?.type || "").toLowerCase();
+  if (type.includes("png")) return ".png";
+  if (type.includes("webp")) return ".webp";
+  return ".jpg";
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Could not read image."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImageElement(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not process image."));
+    image.src = src;
+  });
+}
+
+async function prepareJobImageForUpload(file, index) {
+  const uploadName = `install photo ${String(index + 1).padStart(2, "0")}.jpg`;
+
+  if (!String(file?.type || "").startsWith("image/")) {
+    return {
+      name: uploadName,
+      type: file?.type || "application/octet-stream",
+      contentBase64: await fileToBase64(file)
+    };
+  }
+
+  const dataUrl = await readFileAsDataUrl(file);
+  const image = await loadImageElement(dataUrl);
+  const maxDimension = 1800;
+  let { width, height } = image;
+
+  if (width > maxDimension || height > maxDimension) {
+    const scale = Math.min(maxDimension / width, maxDimension / height);
+    width = Math.max(1, Math.round(width * scale));
+    height = Math.max(1, Math.round(height * scale));
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  context.drawImage(image, 0, 0, width, height);
+
+  const compressedBlob = await new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Could not compress image."));
+        return;
+      }
+      resolve(blob);
+    }, "image/jpeg", 0.82);
+  });
+
+  return {
+    name: uploadName,
+    type: "image/jpeg",
+    contentBase64: await fileToBase64(compressedBlob)
+  };
 }
 
 function navigateCamera(direction) {
@@ -994,16 +1064,14 @@ saveJobNoteButton.addEventListener("click", async () => {
   setJobNoteStatus("Saving note to Zoho...", "");
 
   try {
+    const preparedFiles = await Promise.all(
+      files.map((entry, index) => prepareJobImageForUpload(entry.file, index))
+    );
+
     const payload = {
       jobRecordId: currentJob.id,
       note,
-      files: await Promise.all(
-        files.map(async (file) => ({
-          name: file.name,
-          type: file.type || "image/jpeg",
-          contentBase64: await fileToBase64(file)
-        }))
-      )
+      files: preparedFiles
     };
 
     const response = await fetch("/api/zoho-job-note", {
@@ -1012,7 +1080,13 @@ saveJobNoteButton.addEventListener("click", async () => {
       body: JSON.stringify(payload)
     });
 
-    const result = await response.json();
+    const rawText = await response.text();
+    let result = {};
+    try {
+      result = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      result = { error: rawText || "Unexpected server response." };
+    }
     if (!response.ok) {
       throw new Error(result.error || "Could not save the job note.");
     }
