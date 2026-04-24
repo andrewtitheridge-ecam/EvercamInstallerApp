@@ -45,6 +45,12 @@ const jobNameText = document.getElementById("job-name");
 const jobMetaText = document.getElementById("job-meta");
 const jobWorksheetLink = document.getElementById("job-worksheet-link");
 const jobCameras = document.getElementById("job-cameras");
+const jobNotePanel = document.getElementById("job-note-panel");
+const jobNoteContent = document.getElementById("job-note-content");
+const jobNoteImages = document.getElementById("job-note-images");
+const jobNoteFiles = document.getElementById("job-note-files");
+const jobNoteStatus = document.getElementById("job-note-status");
+const saveJobNoteButton = document.getElementById("save-job-note");
 const adminSnapshotTools = document.getElementById("admin-snapshot-tools");
 const adminSnapshotLink = document.getElementById("admin-snapshot-link");
 
@@ -198,6 +204,15 @@ function setLookupStatus(message, tone = "") {
   lookupStatusText.className = `helper-text${tone ? ` ${tone}` : ""}`;
 }
 
+function setJobNoteStatus(message, tone = "") {
+  jobNoteStatus.textContent = message;
+  jobNoteStatus.className = `helper-text${tone ? ` ${tone}` : ""}`;
+}
+
+function canAddJobNotes(job) {
+  return String(job?.status || "").trim().toLowerCase() === "scheduled";
+}
+
 function setLookupStatusHtml(message, tone = "") {
   lookupStatusText.innerHTML = message;
   lookupStatusText.className = `helper-text${tone ? ` ${tone}` : ""}`;
@@ -252,6 +267,41 @@ function updateCameraNavigation() {
   nextCameraButton.disabled = currentIndex >= currentCameraCollection.length - 1;
   overlayPrevCameraButton.disabled = currentIndex <= 0;
   overlayNextCameraButton.disabled = currentIndex >= currentCameraCollection.length - 1;
+}
+
+function renderSelectedJobFiles() {
+  const files = Array.from(jobNoteImages.files || []);
+  jobNoteFiles.textContent = files.length
+    ? `${files.length} photo${files.length === 1 ? "" : "s"} selected: ${files.map((file) => file.name).join(", ")}`
+    : "No photos selected.";
+}
+
+function resetJobNoteForm() {
+  jobNoteContent.value = "";
+  jobNoteImages.value = "";
+  renderSelectedJobFiles();
+  setJobNoteStatus("");
+}
+
+function showJobNotePanel() {
+  jobNotePanel.hidden = false;
+  renderSelectedJobFiles();
+}
+
+function hideJobNotePanel() {
+  jobNotePanel.hidden = true;
+  resetJobNoteForm();
+}
+
+async function fileToBase64(file) {
+  const buffer = await file.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function navigateCamera(direction) {
@@ -549,6 +599,11 @@ function renderJobResult(job, selectedCameraId = "") {
   }
 
   renderCameraSelection(job.cameras, selectedCameraId);
+  if (canAddJobNotes(job)) {
+    showJobNotePanel();
+  } else {
+    hideJobNotePanel();
+  }
 }
 
 function renderProjectResult(projectId, cameras, selectedCameraId = "") {
@@ -562,6 +617,7 @@ function renderProjectResult(projectId, cameras, selectedCameraId = "") {
   jobWorksheetLink.hidden = true;
   jobWorksheetLink.removeAttribute("href");
   renderCameraSelection(cameras, selectedCameraId);
+  hideJobNotePanel();
 }
 
 function hideJobResult() {
@@ -573,6 +629,7 @@ function hideJobResult() {
   jobWorksheetLink.hidden = true;
   jobWorksheetLink.removeAttribute("href");
   jobCameras.innerHTML = "";
+  hideJobNotePanel();
   setCurrentCameraCollection([]);
 }
 
@@ -886,6 +943,61 @@ clearLoginButton.addEventListener("click", () => {
   sessionAuthToken = "";
 });
 
+jobNoteImages.addEventListener("change", renderSelectedJobFiles);
+
+saveJobNoteButton.addEventListener("click", async () => {
+  if (!currentJob?.id) {
+    setJobNoteStatus("Find a CRM job first before saving a note.", "error");
+    return;
+  }
+
+  const note = jobNoteContent.value.trim();
+  const files = Array.from(jobNoteImages.files || []);
+
+  if (!note && files.length === 0) {
+    setJobNoteStatus("Add some note text or at least one photo before saving.", "error");
+    return;
+  }
+
+  saveJobNoteButton.disabled = true;
+  setJobNoteStatus("Saving note to Zoho...", "");
+
+  try {
+    const payload = {
+      jobRecordId: currentJob.id,
+      note,
+      files: await Promise.all(
+        files.map(async (file) => ({
+          name: file.name,
+          type: file.type || "image/jpeg",
+          contentBase64: await fileToBase64(file)
+        }))
+      )
+    };
+
+    const response = await fetch("/api/zoho-job-note", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || "Could not save the job note.");
+    }
+
+    resetJobNoteForm();
+    setJobNoteStatus(
+      `Saved ${result.createdNotes || 0} note${result.createdNotes === 1 ? "" : "s"} and ${result.uploadedFiles || 0} photo${result.uploadedFiles === 1 ? "" : "s"} to this job.`,
+      "success"
+    );
+  } catch (error) {
+    setJobNoteStatus(error.message || "Could not save the job note.", "error");
+  } finally {
+    saveJobNoteButton.disabled = false;
+  }
+});
+
 openLocalCameraButton.addEventListener("click", () => {
   const url = buildLocalCameraUrl();
   updateLocalFeedUi();
@@ -912,6 +1024,7 @@ localPortInput.value = localFeedSettings.port;
 cameraBrandSelect.value = localFeedSettings.brand;
 updateLocalFeedUi();
 renderSavedCameraIds();
+renderSelectedJobFiles();
 lookupInput.addEventListener("input", () => {
   const start = lookupInput.selectionStart;
   const end = lookupInput.selectionEnd;
