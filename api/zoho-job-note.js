@@ -59,13 +59,13 @@ async function createJobNote(accessToken, jobRecordId, noteContent) {
   return json?.data?.[0]?.details?.id || "";
 }
 
-function buildNoteContent(note, files) {
+function buildNoteContent(note, files, options = {}) {
   const normalizedNote = typeof note === "string" ? note.trim() : "";
   const normalizedFiles = Array.isArray(files)
     ? files.filter((file) => file?.name)
     : [];
 
-  if (!normalizedFiles.length) {
+  if (!normalizedFiles.length || options.skipAttachmentSummary) {
     return normalizedNote;
   }
 
@@ -130,7 +130,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { jobRecordId, note, files } = req.body || {};
+    const { jobRecordId, note, files, skipAttachmentSummary } = req.body || {};
 
     if (!jobRecordId) {
       return sendJson(res, 400, { error: "Job record ID is required." });
@@ -138,7 +138,9 @@ module.exports = async (req, res) => {
 
     const normalizedNote = typeof note === "string" ? note.trim() : "";
     const normalizedFiles = Array.isArray(files) ? files : [];
-    const noteContent = buildNoteContent(normalizedNote, normalizedFiles);
+    const noteContent = buildNoteContent(normalizedNote, normalizedFiles, {
+      skipAttachmentSummary: Boolean(skipAttachmentSummary)
+    });
 
     if (!noteContent && normalizedFiles.length === 0) {
       return sendJson(res, 400, { error: "Provide note text or at least one image." });

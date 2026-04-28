@@ -29,6 +29,15 @@ function buildWorksheetUrl(job) {
   return `${INSTALLATION_WORKSHEET_BASE_URL}?${query}`;
 }
 
+function getSubformCameraName(item) {
+  return item.Camera_Name
+    || item.Camera
+    || item.Name
+    || item.Camera_Name1
+    || item.Camera_Description
+    || "";
+}
+
 async function getAccessToken() {
   const params = new URLSearchParams({
     refresh_token: process.env.ZOHO_REFRESH_TOKEN || "",
@@ -152,7 +161,7 @@ module.exports = async (req, res) => {
           .filter((item) => item.Evercam_ID)
           .map((item) => ({
             id: item.Evercam_ID,
-            name: item.Camera_Name || "",
+            name: getSubformCameraName(item),
             type: item.Type || "",
             power: item.Power1 || ""
           }))

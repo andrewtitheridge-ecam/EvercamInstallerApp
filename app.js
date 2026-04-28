@@ -15,6 +15,7 @@ const savedCameras = document.getElementById("saved-cameras");
 const clearHistoryButton = document.getElementById("clear-history");
 const clearLoginButton = document.getElementById("clear-login");
 const refreshButton = document.getElementById("refresh-button");
+const saveSnapshotJobButton = document.getElementById("save-snapshot-job");
 const prevCameraButton = document.getElementById("prev-camera-button");
 const nextCameraButton = document.getElementById("next-camera-button");
 const overlayPrevCameraButton = document.getElementById("overlay-prev-camera-button");
@@ -65,6 +66,7 @@ let sessionAuthToken = "";
 let currentCameraCollection = [];
 let currentCameraMeta = null;
 let selectedJobFiles = [];
+let currentSnapshotBlob = null;
 
 function getSavedCameraIds() {
   try {
@@ -242,17 +244,48 @@ function updateCurrentCameraText(cameraId = currentCameraId, cameraName = curren
   updateCameraNavigation();
 }
 
+function getCameraDisplayName(camera) {
+  const candidate = camera?.name
+    || camera?.cameraName
+    || camera?.Camera_Name
+    || camera?.label
+    || "";
+  return String(candidate || "").trim();
+}
+
 function setCurrentCameraCollection(cameras = []) {
   currentCameraCollection = Array.isArray(cameras)
     ? cameras
         .map((camera) => ({
           id: (camera.id || "").trim().toLowerCase(),
-          name: camera.name || ""
+          name: getCameraDisplayName(camera)
         }))
         .filter((camera) => camera.id)
     : [];
   updateCameraNavigation();
 }
+
+function updateCameraCollectionName(cameraId, cameraName) {
+  const normalizedId = String(cameraId || "").trim().toLowerCase();
+  const displayName = String(cameraName || "").trim();
+  if (!normalizedId || !displayName || !currentCameraCollection.length) {
+    return;
+  }
+
+  let changed = false;
+  currentCameraCollection = currentCameraCollection.map((camera) => {
+    if (camera.id !== normalizedId || camera.name === displayName) {
+      return camera;
+    }
+    changed = true;
+    return { ...camera, name: displayName };
+  });
+
+  if (changed && !jobResult.hidden) {
+    renderCameraSelection(currentCameraCollection, currentCameraId);
+  }
+}
+
 
 function updateCameraNavigation() {
   const currentIndex = currentCameraCollection.findIndex((camera) => camera.id === currentCameraId);
@@ -278,6 +311,19 @@ function updateCameraNavigation() {
   overlayNextCameraButton.disabled = currentIndex >= currentCameraCollection.length - 1;
 }
 
+function updateSaveSnapshotJobButton() {
+  const canSaveSnapshot = Boolean(
+    currentTab === "snapshot" &&
+    currentJob?.id &&
+    canAddJobNotes(currentJob) &&
+    currentSnapshotBlob &&
+    currentCameraId
+  );
+
+  saveSnapshotJobButton.hidden = !canSaveSnapshot;
+  saveSnapshotJobButton.disabled = !canSaveSnapshot;
+}
+
 function getJobFileKey(file) {
   return [file.name, file.size, file.lastModified].join("::");
 }
@@ -300,6 +346,33 @@ function renderSelectedJobFiles() {
   jobNoteFiles.textContent = files.length
     ? `${files.length} photo${files.length === 1 ? "" : "s"} selected: ${files.map((entry, index) => `install photo ${String(index + 1).padStart(2, "0")}${getPreferredImageExtension(entry.file)}`).join(", ")}`
     : "No photos selected.";
+}
+
+function getSnapshotTimestamp(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate())
+  ].join("-") + ` ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function getSnapshotFilenameTimestamp(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate())
+  ].join("") + `-${pad(date.getHours())}${pad(date.getMinutes())}`;
+}
+
+function getSafeFilenamePart(value) {
+  return String(value || "camera")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "camera";
 }
 
 function resetJobNoteForm() {
@@ -523,7 +596,8 @@ function applyCameraMetadata(camera) {
   }
 
   currentCameraMeta = camera;
-  currentCameraName = camera.name || currentCameraName;
+  currentCameraName = getCameraDisplayName(camera) || currentCameraName;
+  updateCameraCollectionName(camera.id || currentCameraId, currentCameraName);
   updateCurrentCameraText(camera.id || currentCameraId, currentCameraName);
   updateAdminSnapshotUi(camera);
 }
@@ -660,14 +734,14 @@ function renderCameraSelection(cameras, selectedCameraId = "") {
     const loadButton = document.createElement("button");
     loadButton.type = "button";
     loadButton.className = "saved-camera-load";
-    const displayName = (camera.name || "").trim() || camera.id;
+    const displayName = getCameraDisplayName(camera) || camera.id;
     loadButton.textContent = displayName;
-    loadButton.title = camera.name
-      ? `${camera.name} (${camera.id})`
+    loadButton.title = displayName !== camera.id
+      ? `${displayName} (${camera.id})`
       : camera.id;
     loadButton.setAttribute(
       "aria-label",
-      camera.name ? `Load ${camera.name}` : `Load ${camera.id}`
+      displayName !== camera.id ? `Load ${displayName}` : `Load ${camera.id}`
     );
     if (selectedCameraId && camera.id === selectedCameraId) {
       loadButton.setAttribute("aria-current", "true");
@@ -736,6 +810,8 @@ function hideJobResult() {
   jobCameras.innerHTML = "";
   hideJobNotePanel();
   setCurrentCameraCollection([]);
+  currentSnapshotBlob = null;
+  updateSaveSnapshotJobButton();
 }
 
 function looksLikeProjectId(value) {
@@ -801,6 +877,8 @@ function switchTab(tab, options = {}) {
   if (isLocal) {
     updateLocalFeedUi();
   }
+
+  updateSaveSnapshotJobButton();
 }
 
 async function loadSnapshot(cameraId, options = {}) {
@@ -811,6 +889,8 @@ async function loadSnapshot(cameraId, options = {}) {
   }
 
   currentCameraId = normalized;
+  currentSnapshotBlob = null;
+  updateSaveSnapshotJobButton();
   if (!options.preserveCameraName) {
     currentCameraName = "";
   }
@@ -871,13 +951,17 @@ async function loadSnapshot(cameraId, options = {}) {
       snapshotPlaceholder.textContent = `Downloading snapshot... ${percent}%`;
     });
 
+    currentSnapshotBlob = blob;
     currentObjectUrl = URL.createObjectURL(blob);
     snapshotImage.src = currentObjectUrl;
     snapshotImage.alt = `Live snapshot for ${normalized}`;
     snapshotImage.hidden = false;
     snapshotPlaceholder.hidden = true;
     setStatus("Snapshot loaded.", "success");
+    updateSaveSnapshotJobButton();
   } catch (error) {
+    currentSnapshotBlob = null;
+    updateSaveSnapshotJobButton();
     const message = authUsernameInput.value.trim()
       ? "Could not load that camera. Check the camera ID, token access, or browser CORS restrictions."
       : "Could not load that camera. It may be private, unavailable, or the ID may be incorrect.";
@@ -896,6 +980,8 @@ async function loadLiveFeed(cameraId, options = {}) {
   }
 
   currentCameraId = normalized;
+  currentSnapshotBlob = null;
+  updateSaveSnapshotJobButton();
   if (!options.preserveCameraName) {
     currentCameraName = "";
   }
@@ -1114,6 +1200,58 @@ saveJobNoteButton.addEventListener("click", async () => {
     setJobNoteStatus(error.message || "Could not save the job note.", "error");
   } finally {
     saveJobNoteButton.disabled = false;
+  }
+});
+
+saveSnapshotJobButton.addEventListener("click", async () => {
+  if (!currentJob?.id || !currentSnapshotBlob || !currentCameraId) {
+    setStatus("Load a job snapshot before saving it to CRM.", "error");
+    return;
+  }
+
+  const now = new Date();
+  const cameraLabel = currentCameraName || currentCameraId;
+  const note = `Snapshot of camera FoV - ${cameraLabel} - ${getSnapshotTimestamp(now)}`;
+  const filename = `snapshot fov - ${getSafeFilenamePart(cameraLabel)} - ${getSnapshotFilenameTimestamp(now)}.jpg`;
+
+  saveSnapshotJobButton.disabled = true;
+  setStatus("Saving snapshot to CRM job...", "");
+
+  try {
+    const response = await fetch("/api/zoho-job-note", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jobRecordId: currentJob.id,
+        note,
+        skipAttachmentSummary: true,
+        files: [
+          {
+            name: filename,
+            type: currentSnapshotBlob.type || "image/jpeg",
+            contentBase64: await fileToBase64(currentSnapshotBlob)
+          }
+        ]
+      })
+    });
+
+    const rawText = await response.text();
+    let result = {};
+    try {
+      result = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      result = { error: rawText || "Unexpected server response." };
+    }
+
+    if (!response.ok) {
+      throw new Error(result.error || "Could not save the snapshot to CRM.");
+    }
+
+    setStatus("Snapshot saved to the CRM job.", "success");
+  } catch (error) {
+    setStatus(error.message || "Could not save the snapshot to CRM.", "error");
+  } finally {
+    updateSaveSnapshotJobButton();
   }
 });
 
