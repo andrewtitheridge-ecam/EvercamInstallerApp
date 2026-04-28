@@ -660,8 +660,15 @@ function renderCameraSelection(cameras, selectedCameraId = "") {
     const loadButton = document.createElement("button");
     loadButton.type = "button";
     loadButton.className = "saved-camera-load";
-    loadButton.textContent = camera.id;
-    loadButton.title = camera.name || camera.id;
+    const displayName = (camera.name || "").trim() || camera.id;
+    loadButton.textContent = displayName;
+    loadButton.title = camera.name
+      ? `${camera.name} (${camera.id})`
+      : camera.id;
+    loadButton.setAttribute(
+      "aria-label",
+      camera.name ? `Load ${camera.name}` : `Load ${camera.id}`
+    );
     if (selectedCameraId && camera.id === selectedCameraId) {
       loadButton.setAttribute("aria-current", "true");
     }
