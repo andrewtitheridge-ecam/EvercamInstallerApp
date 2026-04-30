@@ -5,6 +5,14 @@ const REMEMBERED_PASSWORD_KEY = "evercam-remembered-password";
 const LOCAL_FEED_STORAGE_KEY = "evercam-local-feed-settings";
 const MAX_SAVED = 8;
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js").catch(() => {
+      // PWA support is helpful but should never block the installer workflow.
+    });
+  });
+}
+
 const lookupForm = document.getElementById("lookup-form");
 const lookupInput = document.getElementById("lookup-id");
 const lookupSuggestions = document.getElementById("lookup-suggestions");
@@ -1429,7 +1437,7 @@ lookupForm.addEventListener("submit", async (event) => {
         setLookupStatus("Job lookup is not configured in Vercel yet. Add the Zoho environment variables, or use a camera or project ID instead.", "error");
         return;
       }
-      setLookupStatus(message, "error");
+      setLookupStatus("Invalid job number", "error");
     }
     return;
   }
