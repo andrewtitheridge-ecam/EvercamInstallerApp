@@ -603,4 +603,25 @@ button:disabled {
   .tab-button {
     flex: 1;
   }
+
+  .viewer-panel {
+    padding: 14px;
+  }
+
+  .snapshot-frame {
+    min-height: 56vh;
+    border-radius: 16px;
+  }
+
+  #snapshot-image {
+    width: 100%;
+    min-height: 56vh;
+    height: 56vh;
+    object-fit: cover;
+  }
+
+  .placeholder,
+  .live-video {
+    min-height: 56vh;
+  }
 }
