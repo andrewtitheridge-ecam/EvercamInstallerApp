@@ -565,6 +565,14 @@ button:disabled {
   text-align: center;
 }
 
+.rotate-hint {
+  display: none;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  text-align: center;
+}
+
 @media (max-width: 720px) {
   .app-shell {
     width: min(100% - 20px, 1100px);
@@ -623,5 +631,21 @@ button:disabled {
   .placeholder,
   .live-video {
     min-height: 56vh;
+  }
+}
+
+@media (max-width: 720px) and (orientation: portrait) {
+  .snapshot-frame {
+    min-height: auto;
+  }
+
+  #snapshot-image {
+    height: auto;
+    min-height: 0;
+    object-fit: contain;
+  }
+
+  .rotate-hint {
+    display: block;
   }
 }
