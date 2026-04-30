@@ -1405,7 +1405,9 @@ lookupForm.addEventListener("submit", async (event) => {
     hideJobResult();
 
     try {
-      const response = await fetch(`/api/zoho-job?jobId=${encodeURIComponent(jobId)}`);
+      const response = await fetch(`/api/zoho-job?jobId=${encodeURIComponent(jobId)}&t=${Date.now()}`, {
+        cache: "no-store"
+      });
       const result = await response.json();
 
       if (!response.ok) {
@@ -1437,7 +1439,7 @@ lookupForm.addEventListener("submit", async (event) => {
         setLookupStatus("Job lookup is not configured in Vercel yet. Add the Zoho environment variables, or use a camera or project ID instead.", "error");
         return;
       }
-      setLookupStatus("Invalid job number", "error");
+      setLookupStatus("Invalid job number.", "error");
     }
     return;
   }

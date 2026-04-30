@@ -5,6 +5,7 @@ const INSTALLATION_WORKSHEET_BASE_URL = "https://forms.zohopublic.com/Evercam/fo
 function sendJson(res, status, body) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "no-store");
   res.end(JSON.stringify(body));
 }
 
@@ -36,6 +37,23 @@ function getSubformCameraName(item) {
     || item.Camera_Name1
     || item.Camera_Description
     || "";
+}
+
+async function fetchBlueprintStage(accessToken, recordId) {
+  const response = await fetch(`${ZOHO_API_DOMAIN}/crm/v8/Install/${recordId}/actions/blueprint`, {
+    headers: { Authorization: `Zoho-oauthtoken ${accessToken}` }
+  });
+
+  if (!response.ok) {
+    return "";
+  }
+
+  const json = await response.json();
+  return json?.blueprint?.process_info?.field_value || "";
+}
+
+function isScheduledStage(stage) {
+  return String(stage || "").trim().toLowerCase() === "scheduled";
 }
 
 async function getAccessToken() {
@@ -141,12 +159,17 @@ module.exports = async (req, res) => {
     const jobMatch = await fetchJob(tokenData.access_token, jobId);
 
     if (!jobMatch) {
-      return sendJson(res, 404, { error: `No job found for ${jobId}.` });
+      return sendJson(res, 404, { error: "Invalid job number." });
+    }
+
+    const blueprintStage = await fetchBlueprintStage(tokenData.access_token, jobMatch.id);
+    if (!isScheduledStage(blueprintStage)) {
+      return sendJson(res, 404, { error: "Invalid job number." });
     }
 
     let job = await fetchJobDetails(tokenData.access_token, jobMatch.id);
     if (!job) {
-      return sendJson(res, 404, { error: `No job details found for ${jobId}.` });
+      return sendJson(res, 404, { error: "Invalid job number." });
     }
 
     if (!Array.isArray(job.Kit_Information) || job.Kit_Information.length === 0) {
