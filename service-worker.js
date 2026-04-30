@@ -1,10 +1,9 @@
-const CACHE_NAME = "evercam-installer-v1";
+const CACHE_NAME = "evercam-installer-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/styles.css",
   "/app.js",
-  "/manifest.webmanifest",
   "/icons/icon.svg",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -19,6 +18,10 @@ function isCacheableAppRequest(request) {
   }
 
   if (url.pathname.startsWith("/api/")) {
+    return false;
+  }
+
+  if (url.pathname === "/manifest.webmanifest") {
     return false;
   }
 

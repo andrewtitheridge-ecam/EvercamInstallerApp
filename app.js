@@ -610,6 +610,52 @@ function applyCameraMetadata(camera) {
   updateAdminSnapshotUi(camera);
 }
 
+function getCameraStateSummary(camera) {
+  if (!camera) {
+    return "";
+  }
+
+  const parts = [];
+  const status = camera.status || camera.State || "";
+  const offlineReason = camera.offline_reason || camera.offlineReason || "";
+  const lastOnline = camera.last_online_at || camera.lastOnlineAt || "";
+
+  if (status) {
+    parts.push(`Status: ${status}`);
+  }
+
+  if (offlineReason) {
+    parts.push(`Reason: ${offlineReason}`);
+  }
+
+  if (lastOnline) {
+    parts.push(`Last online: ${lastOnline}`);
+  }
+
+  return parts.join(" | ");
+}
+
+function getSnapshotFailureMessage(statusCode, camera) {
+  if (statusCode === 401) {
+    return "Login failed or session expired. Please sign in again.";
+  }
+
+  if (statusCode === 403) {
+    return "Camera found, but your user does not have viewer access to this camera.";
+  }
+
+  const stateSummary = getCameraStateSummary(camera);
+  if (camera) {
+    return stateSummary
+      ? `Camera found, but the snapshot is not available right now. ${stateSummary}`
+      : "Camera found, but the snapshot is not available right now.";
+  }
+
+  return authUsernameInput.value.trim()
+    ? "Could not load that camera. Check the camera ID, camera access, or browser restrictions."
+    : "Could not load that camera. It may be private, unavailable, or the ID may be incorrect.";
+}
+
 async function readResponseBlobWithProgress(response, onProgress) {
   if (!response.body || typeof response.body.getReader !== "function") {
     onProgress?.(null);
@@ -1123,6 +1169,14 @@ prevCameraButton.addEventListener("click", () => navigateCamera(-1));
 nextCameraButton.addEventListener("click", () => navigateCamera(1));
 overlayPrevCameraButton.addEventListener("click", () => navigateCamera(-1));
 overlayNextCameraButton.addEventListener("click", () => navigateCamera(1));
+
+snapshotImage.addEventListener("click", () => {
+  if (!currentObjectUrl || snapshotImage.hidden) {
+    return;
+  }
+
+  window.open(currentObjectUrl, "_blank", "noopener,noreferrer");
+});
 
 snapshotTabButton.addEventListener("click", () => switchTab("snapshot"));
 liveTabButton.addEventListener("click", () => switchTab("live"));
