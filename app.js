@@ -640,6 +640,10 @@ function getSnapshotFailureMessage(statusCode, camera) {
     return "Login failed or session expired. Please sign in again.";
   }
 
+  if (statusCode === 400) {
+    return "Camera found, but Evercam cannot return a live snapshot while this camera is in its current status.";
+  }
+
   if (statusCode === 403) {
     return "Camera found, but your user does not have viewer access to this camera.";
   }
@@ -988,7 +992,9 @@ async function loadSnapshot(cameraId, options = {}) {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      const error = new Error(`HTTP ${response.status}`);
+      error.statusCode = response.status;
+      throw error;
     }
 
     setStatus("Success. Snapshot is loading in the background...", "success");
@@ -1016,9 +1022,7 @@ async function loadSnapshot(cameraId, options = {}) {
   } catch (error) {
     currentSnapshotBlob = null;
     updateSaveSnapshotJobButton();
-    const message = authUsernameInput.value.trim()
-      ? "Could not load that camera. Check the camera ID, token access, or browser CORS restrictions."
-      : "Could not load that camera. It may be private, unavailable, or the ID may be incorrect.";
+    const message = getSnapshotFailureMessage(error.statusCode, currentCameraMeta);
     setStatus(message, "error");
     snapshotImage.hidden = true;
     snapshotPlaceholder.hidden = false;
